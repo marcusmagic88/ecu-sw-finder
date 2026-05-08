@@ -388,7 +388,7 @@ class App:
     def _scan_done(self, total: int):
         self.btn_scan.config(state=tk.NORMAL)
         self.btn_stop.config(state=tk.DISABLED, text="◼  Stop")
-        self._refresh_tree()
+        self._apply_filter(silent=True)   # popola _filtered e aggiorna la tabella
         n  = len(self._records)
         nf = len(self._filtered)
         self.status_var.set(f"Scansione completata — {n} sessioni trovate su {total} file.")
@@ -396,7 +396,6 @@ class App:
             self.progress_bar["maximum"] = total
             self.progress_bar["value"]   = total
         self.pct_label.config(text="100%" if total > 0 else "")
-        # Defer popup so the UI finishes rendering first
         self.root.after(100, lambda: self._show_done_popup(total, n, nf))
 
     def _show_done_popup(self, total: int, n: int, nf: int):
