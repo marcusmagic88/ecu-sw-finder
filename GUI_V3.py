@@ -382,19 +382,34 @@ class App:
 
     def _scan_done(self, total: int):
         self.btn_scan.config(state=tk.NORMAL)
-        self.btn_stop.config(state=tk.DISABLED)
-        self.btn_stop.config(text="◼  Stop")
+        self.btn_stop.config(state=tk.DISABLED, text="◼  Stop")
         self._refresh_tree()
-        n = len(self._records)
+        n  = len(self._records)
+        nf = len(self._filtered)
         self.status_var.set(f"Scansione completata — {n} sessioni trovate su {total} file.")
-        self.progress_bar["value"] = self.progress_bar["maximum"]
-        self.pct_label.config(text="100%")
+        if total > 0:
+            self.progress_bar["maximum"] = total
+            self.progress_bar["value"]   = total
+        self.pct_label.config(text="100%" if total > 0 else "")
+        # Defer popup so the UI finishes rendering first
+        self.root.after(100, lambda: self._show_done_popup(total, n, nf))
+
+    def _show_done_popup(self, total: int, n: int, nf: int):
+        self.root.lift()
+        self.root.focus_force()
         if total == 0:
             messagebox.showinfo("Nessun file trovato",
-                "Nessun file *history.txt trovato nella directory selezionata.")
+                "Nessun file *history.txt trovato nella directory selezionata.",
+                parent=self.root)
         elif n == 0:
             messagebox.showinfo("Nessuna sessione trovata",
-                f"Trovati {total} file ma nessuno contiene dati ECU validi.")
+                f"Trovati {total} file ma nessuno contiene dati ECU validi.",
+                parent=self.root)
+        elif nf == 0:
+            q = self.entry_search.get().strip()
+            messagebox.showinfo("Nessun risultato",
+                f"Trovate {n} sessioni ma nessuna corrisponde alla ricerca '{q}'.",
+                parent=self.root)
 
     def _poll_queue(self):
         try:
