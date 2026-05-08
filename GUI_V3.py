@@ -420,9 +420,10 @@ class App:
             self._iid_map[iid] = rec["path"]
 
     # ── Double-click / open ───────────────────────────────────────────────────
-    def _on_double_click(self, _event):
-        iid  = self.tree.focus()
+    def _on_double_click(self, event):
+        iid  = self.tree.identify_row(event.y)
         path = self._iid_map.get(iid)
+        print(f"[DBG] iid={iid!r}  path={path!r}  exists={os.path.exists(path) if path else 'N/A'}")
         if path and os.path.exists(path):
             subprocess.Popen(f'explorer /select,"{path}"', shell=True)
 
