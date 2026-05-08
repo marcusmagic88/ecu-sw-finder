@@ -1,0 +1,8 @@
+venv/
+build/
+dist/
+__pycache__/
+*.pyc
+*.pyo
+log.txt
+log_risultati_ascii.txt
