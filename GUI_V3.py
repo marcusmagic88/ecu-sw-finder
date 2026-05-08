@@ -419,16 +419,16 @@ class App:
     def _on_double_click(self, _event):
         sel = self.tree.focus()
         if sel and os.path.exists(sel):
-            subprocess.Popen(["explorer", f"/select,{sel}"])
+            subprocess.Popen(f'explorer /select,"{sel}"', shell=True)
 
     def _open_folder(self):
         sel = self.tree.focus()
         if sel and os.path.exists(sel):
-            subprocess.Popen(["explorer", f"/select,{sel}"])
+            subprocess.Popen(f'explorer /select,"{sel}"', shell=True)
         else:
             d = self.entry_dir.get().strip()
             if d and os.path.isdir(d):
-                subprocess.Popen(["explorer", d])
+                os.startfile(d)
 
     # ── Export ────────────────────────────────────────────────────────────────
     def _export_csv(self):
