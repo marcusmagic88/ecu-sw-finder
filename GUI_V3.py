@@ -218,6 +218,10 @@ class App:
                     background=BG3, troughcolor=BG2,
                     arrowcolor=FG2, borderwidth=0, relief="flat")
 
+        s.configure("TProgressbar",
+                    troughcolor=BG2, background=ACCENT,
+                    borderwidth=0, thickness=20)
+
         s.configure("Status.TLabel",
                     background=BG3, foreground=FG2,
                     font=("Helvetica", 9), padding=(10, 4))
@@ -261,6 +265,7 @@ class App:
         self.entry_search = ttk.Entry(ctrl, width=34)
         self.entry_search.pack(side=tk.LEFT, padx=(0, 6))
         self.entry_search.bind("<KeyRelease>", lambda _: self._apply_filter())
+        self.entry_search.bind("<Return>", lambda _: self._apply_filter(notify_empty=True))
 
         ttk.Label(ctrl, text="in:").pack(side=tk.LEFT, padx=(0, 4))
         self.filter_col = tk.StringVar(value="Tutti")
@@ -274,14 +279,6 @@ class App:
         ttk.Button(ctrl, text="Pulisci",       command=self._clear).pack(side=tk.LEFT, padx=(0, 4))
         ttk.Button(ctrl, text="Esporta CSV",   command=self._export_csv).pack(side=tk.LEFT, padx=(0, 4))
         ttk.Button(ctrl, text="Apri cartella", command=self._open_folder).pack(side=tk.LEFT)
-
-        # ── Progress bar ──
-        prog = ttk.Frame(self.root, padding=(14, 0, 14, 4))
-        prog.pack(fill=tk.X)
-        self.progress_bar = ttk.Progressbar(prog, orient="horizontal", mode="determinate")
-        self.progress_bar.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8))
-        self.pct_label = ttk.Label(prog, text="", width=5, anchor="e")
-        self.pct_label.pack(side=tk.LEFT)
 
         # ── Treeview ──
         tree_frame = ttk.Frame(self.root, padding=(14, 0, 14, 0))
@@ -317,6 +314,15 @@ class App:
         self.status_var = tk.StringVar(value="Pronto — seleziona una directory e premi Scansiona.")
         ttk.Label(self.root, textvariable=self.status_var,
                   style="Status.TLabel").pack(fill=tk.X, side=tk.BOTTOM)
+
+        # ── Progress bar (bottom, above status bar) ──
+        prog = ttk.Frame(self.root, padding=(14, 3, 14, 3))
+        prog.pack(fill=tk.X, side=tk.BOTTOM)
+        self.pct_label = ttk.Label(prog, text="", width=5, anchor="e",
+                                   foreground=ACCENT, font=("Helvetica", 9, "bold"))
+        self.pct_label.pack(side=tk.RIGHT)
+        self.progress_bar = ttk.Progressbar(prog, orient="horizontal", mode="determinate")
+        self.progress_bar.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
 
     # ── Actions ───────────────────────────────────────────────────────────────
     def _browse(self):
@@ -396,13 +402,19 @@ class App:
                     self.status_var.set(
                         f"Scansione completata — {n} sessioni trovate su {total} file."
                     )
+                    if total == 0:
+                        messagebox.showinfo("Nessun file trovato",
+                            "Nessun file *history.txt trovato nella directory selezionata.")
+                    elif n == 0:
+                        messagebox.showinfo("Nessuna sessione trovata",
+                            f"Trovati {total} file ma nessuno contiene dati ECU validi.")
                     return
         except queue.Empty:
             pass
         self.root.after(100, self._poll_queue)
 
     # ── Filter & sort ─────────────────────────────────────────────────────────
-    def _apply_filter(self, silent=False):
+    def _apply_filter(self, silent=False, notify_empty=False):
         query     = self.entry_search.get().strip().lower()
         col_label = self.filter_col.get()
 
@@ -423,9 +435,12 @@ class App:
 
         self._refresh_tree()
         if not silent:
-            self.status_var.set(
-                f"{len(self._filtered)} risultati  (totale: {len(self._records)})"
-            )
+            n = len(self._filtered)
+            self.status_var.set(f"{n} risultati  (totale: {len(self._records)})")
+            if notify_empty and query and n == 0:
+                campo = f" nel campo '{col_label}'" if col_id else ""
+                messagebox.showinfo("Nessun risultato",
+                    f"Nessuna sessione trovata per '{query}'{campo}.")
 
     def _sort_by(self, col: str):
         self._sort_rev = (col == self._sort_col) and not self._sort_rev
