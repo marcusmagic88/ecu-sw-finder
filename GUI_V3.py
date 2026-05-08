@@ -112,6 +112,7 @@ class App:
 
         self._records:  list[dict] = []
         self._filtered: list[dict] = []
+        self._iid_map:  dict[str, str] = {}   # iid -> full path
         self._sort_col  = "date"
         self._sort_rev  = False
         self._queue     = queue.Queue()
@@ -410,21 +411,26 @@ class App:
 
     def _refresh_tree(self):
         self.tree.delete(*self.tree.get_children())
+        self._iid_map.clear()
         for i, rec in enumerate(self._filtered):
+            iid  = str(i)
             vals = tuple(rec.get(c[0], "") for c in COLUMNS)
             tag  = "odd" if i % 2 else "even"
-            self.tree.insert("", tk.END, values=vals, iid=rec["path"], tags=(tag,))
+            self.tree.insert("", tk.END, values=vals, iid=iid, tags=(tag,))
+            self._iid_map[iid] = rec["path"]
 
     # ── Double-click / open ───────────────────────────────────────────────────
     def _on_double_click(self, _event):
-        sel = self.tree.focus()
-        if sel and os.path.exists(sel):
-            subprocess.Popen(f'explorer /select,"{sel}"', shell=True)
+        iid  = self.tree.focus()
+        path = self._iid_map.get(iid)
+        if path and os.path.exists(path):
+            subprocess.Popen(f'explorer /select,"{path}"', shell=True)
 
     def _open_folder(self):
-        sel = self.tree.focus()
-        if sel and os.path.exists(sel):
-            subprocess.Popen(f'explorer /select,"{sel}"', shell=True)
+        iid  = self.tree.focus()
+        path = self._iid_map.get(iid)
+        if path and os.path.exists(path):
+            subprocess.Popen(f'explorer /select,"{path}"', shell=True)
         else:
             d = self.entry_dir.get().strip()
             if d and os.path.isdir(d):
