@@ -46,17 +46,30 @@ def get_files(directory, filtro):
     return result
 
 
+def detect_encoding(raw):
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        return "utf-16"
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return "utf-8-sig"
+    return "utf-8"
+
+
 def search_text_file(path, strings):
     """Returns list of (string, line_no, line_text) — or ("ERROR", 0, msg)."""
     hits = []
     try:
         with open(path, "rb") as f:
-            for line_no, raw in enumerate(f, 1):
-                raw_lower = raw.lower()
-                for s in strings:
-                    if s.lower().encode("ascii", errors="ignore") in raw_lower:
-                        line_text = raw.decode("utf-8", errors="replace").strip()
-                        hits.append((s, line_no, line_text))
+            raw = f.read()
+        encoding = detect_encoding(raw)
+        try:
+            text = raw.decode(encoding, errors="replace")
+        except Exception:
+            text = raw.decode("latin-1", errors="replace")
+        for line_no, line in enumerate(text.splitlines(), 1):
+            line_lower = line.lower()
+            for s in strings:
+                if s.lower() in line_lower:
+                    hits.append((s, line_no, line.strip()))
     except Exception as e:
         hits.append(("ERROR", 0, str(e)))
     return hits
