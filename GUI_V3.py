@@ -358,6 +358,7 @@ class App:
 
     def _stop_scan(self):
         self._stop_evt.set()
+        self.btn_stop.config(text="Arresto...", state=tk.DISABLED)
 
     def _scan_worker(self, directory: str):
         files = [
@@ -379,10 +380,30 @@ class App:
 
         self._queue.put(("done", total))
 
+    def _scan_done(self, total: int):
+        self.btn_scan.config(state=tk.NORMAL)
+        self.btn_stop.config(state=tk.DISABLED)
+        self.btn_stop.config(text="◼  Stop")
+        self._refresh_tree()
+        n = len(self._records)
+        self.status_var.set(f"Scansione completata — {n} sessioni trovate su {total} file.")
+        self.progress_bar["value"] = self.progress_bar["maximum"]
+        self.pct_label.config(text="100%")
+        if total == 0:
+            messagebox.showinfo("Nessun file trovato",
+                "Nessun file *history.txt trovato nella directory selezionata.")
+        elif n == 0:
+            messagebox.showinfo("Nessuna sessione trovata",
+                f"Trovati {total} file ma nessuno contiene dati ECU validi.")
+
     def _poll_queue(self):
         try:
-            while True:
-                item = self._queue.get_nowait()
+            # Process max 20 items per tick to keep UI responsive
+            for _ in range(20):
+                try:
+                    item = self._queue.get_nowait()
+                except queue.Empty:
+                    break
                 tag = item[0]
                 if tag == "status":
                     self.status_var.set(item[1])
@@ -393,24 +414,15 @@ class App:
                     self.pct_label.config(text=f"{int(val / total * 100)}%")
                 elif tag == "record":
                     self._records.append(item[1])
-                    self._apply_filter(silent=True)
                 elif tag == "done":
-                    total = item[1]
-                    self.btn_scan.config(state=tk.NORMAL)
-                    self.btn_stop.config(state=tk.DISABLED)
-                    n = len(self._records)
-                    self.status_var.set(
-                        f"Scansione completata — {n} sessioni trovate su {total} file."
-                    )
-                    if total == 0:
-                        messagebox.showinfo("Nessun file trovato",
-                            "Nessun file *history.txt trovato nella directory selezionata.")
-                    elif n == 0:
-                        messagebox.showinfo("Nessuna sessione trovata",
-                            f"Trovati {total} file ma nessuno contiene dati ECU validi.")
+                    self._scan_done(item[1])
                     return
-        except queue.Empty:
-            pass
+        except Exception as e:
+            # Always re-enable buttons even on unexpected errors
+            self.btn_scan.config(state=tk.NORMAL)
+            self.btn_stop.config(state=tk.DISABLED)
+            self.status_var.set(f"Errore durante la scansione: {e}")
+            return
         self.root.after(100, self._poll_queue)
 
     # ── Filter & sort ─────────────────────────────────────────────────────────
