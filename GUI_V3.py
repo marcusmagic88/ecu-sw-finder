@@ -1,12 +1,36 @@
 import os
 import re
 import csv
+import ctypes
 import queue
 import threading
-import subprocess
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from datetime import datetime
+
+
+def open_and_select(path: str):
+    """Open Explorer with the file selected — uses Windows Shell API."""
+    path = os.path.normpath(path)
+    shell32 = ctypes.windll.shell32
+    ole32   = ctypes.windll.ole32
+    ole32.CoInitialize(None)
+    try:
+        pidl  = ctypes.c_void_p(None)
+        sfgao = ctypes.c_ulong(0)
+        hr = shell32.SHParseDisplayName(
+            ctypes.c_wchar_p(path), None,
+            ctypes.byref(pidl), 0, ctypes.byref(sfgao)
+        )
+        if hr == 0:
+            shell32.SHOpenFolderAndSelectItems(pidl, 0, None, 0)
+            ole32.CoTaskMemFree(pidl)
+        else:
+            os.startfile(os.path.dirname(path))
+    except Exception:
+        os.startfile(os.path.dirname(path))
+    finally:
+        ole32.CoUninitialize()
 
 try:
     from PIL import Image, ImageTk
@@ -423,15 +447,14 @@ class App:
     def _on_double_click(self, event):
         iid  = self.tree.identify_row(event.y)
         path = self._iid_map.get(iid)
-        print(f"[DBG] iid={iid!r}  path={path!r}  exists={os.path.exists(path) if path else 'N/A'}")
         if path and os.path.exists(path):
-            subprocess.Popen(f'explorer /select,"{path}"', shell=True)
+            open_and_select(path)
 
     def _open_folder(self):
         iid  = self.tree.focus()
         path = self._iid_map.get(iid)
         if path and os.path.exists(path):
-            subprocess.Popen(f'explorer /select,"{path}"', shell=True)
+            open_and_select(path)
         else:
             d = self.entry_dir.get().strip()
             if d and os.path.isdir(d):
