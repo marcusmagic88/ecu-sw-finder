@@ -54,16 +54,21 @@ BORDER  = "#45475a"
 
 # ── Parsing ───────────────────────────────────────────────────────────────────
 FIELD_PATTERNS = {
-    "hw":        re.compile(r"^HW:\s*(.+)$",         re.I | re.M),
-    "sw":        re.compile(r"^SW:\s*(.+)$",          re.I | re.M),
-    "sw2":       re.compile(r"^SW2:\s*(.+)$",         re.I | re.M),
-    "cal":       re.compile(r"^CAL:\s*(.+)$",         re.I | re.M),
-    "fal_pn":    re.compile(r"^FAL PN:\s*(.+)$",      re.I | re.M),
-    "type":      re.compile(r"^Type:\s*(.+)$",         re.I | re.M),
-    "vin":       re.compile(r"^VIN:\s*(\S+)",          re.I | re.M),
-    "mileage":   re.compile(r"Total mileage:\s*(\d+)", re.I),
+    "hw":        re.compile(r"^HW:\s*([^\r\n]+)",         re.I | re.M),
+    "sw":        re.compile(r"^SW:\s*([^\r\n]+)",          re.I | re.M),
+    "sw2":       re.compile(r"^SW2:\s*([^\r\n]+)",         re.I | re.M),
+    "cal":       re.compile(r"^CAL:\s*([^\r\n]+)",         re.I | re.M),
+    "fal_pn":    re.compile(r"^FAL PN:\s*([^\r\n]+)",      re.I | re.M),
+    "type":      re.compile(r"^Type:\s*([^\r\n]+)",         re.I | re.M),
+    "vin":       re.compile(r"^VIN:\s*(\S+)",               re.I | re.M),
+    "mileage":   re.compile(r"Total mileage:\s*(\d+)",      re.I),
     "operation": re.compile(r"[-]{5,}\s+((?!Connect)\w[\w\s/]+?)\s+Started", re.I),
 }
+
+
+def clean_field(s: str) -> str:
+    """Strip whitespace and remove all non-printable/control characters."""
+    return re.sub(r"[^\x20-\x7E -￿]", "", s).strip()
 DATE_RE = re.compile(r"_(\d{14})[_.]")
 
 COLUMNS = [
@@ -117,11 +122,11 @@ def parse_history_file(path: str) -> dict | None:
         if key == "operation":
             ops = pat.findall(text)
             if ops:
-                rec["operation"] = ops[-1].strip()
+                rec["operation"] = clean_field(ops[-1])
         else:
             fm = pat.search(text)
             if fm:
-                rec[key] = fm.group(1).strip()
+                rec[key] = clean_field(fm.group(1))
 
     return rec
 
@@ -459,7 +464,7 @@ class App:
                                 f"Nessuna sessione trovata per '{query}'{campo}.")
 
     def _apply_filter(self, silent=False):
-        query     = self.entry_search.get().strip().lower()
+        query     = clean_field(self.entry_search.get()).lower()
         col_label = self.filter_col.get()
 
         col_id = None
