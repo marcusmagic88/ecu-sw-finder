@@ -134,13 +134,14 @@ class App:
         self.root.state("zoomed")
         self.root.configure(bg=BG)
 
-        self._records:  list[dict] = []
-        self._filtered: list[dict] = []
-        self._iid_map:  dict[str, str] = {}   # iid -> full path
-        self._sort_col  = "date"
-        self._sort_rev  = False
-        self._queue     = queue.Queue()
-        self._stop_evt  = threading.Event()
+        self._records:    list[dict] = []
+        self._filtered:   list[dict] = []
+        self._iid_map:    dict[str, str] = {}
+        self._sort_col    = "date"
+        self._sort_rev    = False
+        self._queue       = queue.Queue()
+        self._stop_evt    = threading.Event()
+        self._debounce_id = None
 
         self._set_icon()
         self._apply_theme()
@@ -264,8 +265,7 @@ class App:
         ttk.Label(ctrl, text="Cerca:").pack(side=tk.LEFT, padx=(0, 4))
         self.entry_search = ttk.Entry(ctrl, width=34)
         self.entry_search.pack(side=tk.LEFT, padx=(0, 6))
-        self.entry_search.bind("<KeyRelease>", lambda _: self._apply_filter())
-        self.entry_search.bind("<Return>", lambda _: self._apply_filter(notify_empty=True))
+        self.entry_search.bind("<KeyRelease>", self._on_search_key)
 
         ttk.Label(ctrl, text="in:").pack(side=tk.LEFT, padx=(0, 4))
         self.filter_col = tk.StringVar(value="Tutti")
@@ -414,7 +414,24 @@ class App:
         self.root.after(100, self._poll_queue)
 
     # ── Filter & sort ─────────────────────────────────────────────────────────
-    def _apply_filter(self, silent=False, notify_empty=False):
+    def _on_search_key(self, _):
+        self._apply_filter()
+        if self._debounce_id:
+            self.root.after_cancel(self._debounce_id)
+            self._debounce_id = None
+        query = self.entry_search.get().strip()
+        if query and self._records:
+            self._debounce_id = self.root.after(700, self._notify_if_empty, query)
+
+    def _notify_if_empty(self, query):
+        self._debounce_id = None
+        if self.entry_search.get().strip().lower() == query.lower() and len(self._filtered) == 0:
+            col_label = self.filter_col.get()
+            campo = f" nel campo '{col_label}'" if col_label != "Tutti" else ""
+            messagebox.showinfo("Nessun risultato",
+                                f"Nessuna sessione trovata per '{query}'{campo}.")
+
+    def _apply_filter(self, silent=False):
         query     = self.entry_search.get().strip().lower()
         col_label = self.filter_col.get()
 
@@ -435,12 +452,9 @@ class App:
 
         self._refresh_tree()
         if not silent:
-            n = len(self._filtered)
-            self.status_var.set(f"{n} risultati  (totale: {len(self._records)})")
-            if notify_empty and query and n == 0:
-                campo = f" nel campo '{col_label}'" if col_id else ""
-                messagebox.showinfo("Nessun risultato",
-                    f"Nessuna sessione trovata per '{query}'{campo}.")
+            self.status_var.set(
+                f"{len(self._filtered)} risultati  (totale: {len(self._records)})"
+            )
 
     def _sort_by(self, col: str):
         self._sort_rev = (col == self._sort_col) and not self._sort_rev
